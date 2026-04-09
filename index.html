@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Календарь приёма растворов</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --surface2: #0f3460;
+    --accent: #e94560;
+    --text: #eee;
+    --text-dim: #999;
+    --border: #333;
+    --ж-color: #ff6b6b;
+    --зб-color: #ffd93d;
+    --зм-color: #6bcb77;
+    --range-bg: rgba(233, 69, 96, 0.18);
+    --range-border: rgba(233, 69, 96, 0.5);
+    --today-bg: rgba(255,255,255,0.08);
+    --box-bg: rgba(79,195,247,0.12);
+    --stock-bg: rgba(100,200,255,0.08);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 1.6rem;
+    margin-bottom: 10px;
+    color: var(--accent);
+  }
+
+  .controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+  }
+
+  .controls button {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 18px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: background 0.2s;
+  }
+  .controls button:hover { background: var(--accent); border-color: var(--accent); }
+
+  .month-label {
+    font-size: 1.3rem;
+    font-weight: 700;
+    min-width: 220px;
+    text-align: center;
+  }
+
+  .calendar {
+    max-width: 900px;
+    margin: 0 auto 24px;
+    background: var(--surface);
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  .weekday-row {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    background: var(--surface2);
+  }
+
+  .weekday-row span {
+    text-align: center;
+    padding: 10px 0;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .days-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+  }
+
+  .day-cell {
+    min-height: 100px;
+    border: 1px solid var(--border);
+    padding: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+    position: relative;
+    user-select: none;
+  }
+
+  .day-cell:hover { background: rgba(255,255,255,0.04); }
+  .day-cell.empty { background: transparent; border-color: transparent; cursor: default; }
+  .day-cell.today { background: var(--today-bg); border-color: var(--accent); }
+  .day-cell.in-range { background: var(--range-bg); border-color: var(--range-border); }
+  .day-cell.range-start,
+  .day-cell.range-end { background: var(--range-border); border-color: var(--accent); }
+
+  .day-number {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--text-dim);
+  }
+  .day-cell.today .day-number { color: var(--accent); }
+
+  .pills-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .pill-tag {
+    font-size: 0.72rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    display: inline-block;
+    white-space: nowrap;
+  }
+
+  .pill-ж { background: rgba(255,107,107,0.2); color: var(--ж-color); border: 1px solid rgba(255,107,107,0.3); }
+  .pill-зб { background: rgba(255,217,61,0.2); color: var(--зб-color); border: 1px solid rgba(255,217,61,0.3); }
+  .pill-зм { background: rgba(107,203,119,0.2); color: var(--зм-color); border: 1px solid rgba(107,203,119,0.3); }
+
+  /* ---- STOCK PANEL ---- */
+  .stock-panel {
+    max-width: 900px;
+    margin: 0 auto 20px;
+    background: var(--stock-bg);
+    border: 1px dashed rgba(100,200,255,0.3);
+    border-radius: 14px;
+    padding: 16px 20px;
+  }
+  .stock-panel h3 { color: #4fc3f7; margin-bottom: 12px; font-size: 1rem; text-align: center; }
+  .stock-inputs {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .stock-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg);
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .stock-item input {
+    width: 60px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 8px;
+    border-radius: 6px;
+    text-align: center;
+    font-size: 1rem;
+  }
+  .stock-item input:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+  .btn-save-stock {
+    display: block;
+    margin: 0 auto;
+    background: rgba(100,200,255,0.15);
+    color: #4fc3f7;
+    border: 1px solid rgba(100,200,255,0.3);
+    padding: 8px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+  }
+  .btn-save-stock:hover { background: rgba(100,200,255,0.25); }
+
+  /* ---- RANGE SUMMARY ---- */
+  .range-summary {
+    max-width: 900px;
+    margin: 0 auto 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 24px;
+    display: none;
+  }
+  .range-summary.visible { display: block; }
+  .range-summary h3 { color: var(--accent); margin-bottom: 10px; font-size: 1rem; }
+  .range-dates { font-size: 0.9rem; color: var(--text-dim); margin-bottom: 16px; }
+
+  .boxes-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .box-card {
+    background: var(--box-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    text-align: center;
+    position: relative;
+  }
+
+  .box-card .box-label { font-size: 0.8rem; color: var(--text-dim); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  
+  .box-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.82rem;
+    padding: 3px 0;
+    color: var(--text-dim);
+  }
+  .box-row .val { font-weight: 700; color: var(--text); }
+  .box-row.need .val { color: #ffb703; }
+  .box-row.buy .val { color: #4fc3f7; }
+  .box-row.left .val { color: #6bcb77; }
+
+  .box-card .box-count-main {
+    font-size: 1.5rem;
+    font-weight: 800;
+    margin: 8px 0 4px;
+  }
+  .box-card.ж .box-count-main { color: var(--ж-color); }
+  .box-card.зб .box-count-main { color: var(--зб-color); }
+  .box-card.зм .box-count-main { color: var(--зм-color); }
+
+  .range-totals {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--border);
+  }
+
+  .range-total-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+  .range-total-item .count { font-size: 1.2rem; }
+
+  .btn-clear-range {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 6px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+  .btn-clear-range:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ---- SETTINGS ---- */
+  .settings-toggle { text-align: center; margin-bottom: 10px; }
+  .settings-toggle button {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 8px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+  }
+  .settings-toggle button:hover { border-color: var(--accent); color: var(--accent); }
+
+  .settings-panel {
+    max-width: 900px;
+    margin: 0 auto 30px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    display: none;
+  }
+  .settings-panel.visible { display: block; }
+  .settings-panel h3 { color: var(--accent); margin-bottom: 16px; }
+  .setting-group { margin-bottom: 18px; }
+  .setting-group label { display: block; margin-bottom: 6px; font-size: 0.9rem; color: var(--text-dim); }
+  .setting-group input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.95rem;
+  }
+
+  .cycle-preview { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; }
+  .cycle-day-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    min-width: 140px;
+  }
+  .cycle-day-card .day-label { font-size: 0.8rem; color: var(--text-dim); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; }
+  .cycle-day-card .pills { display: flex; flex-direction: column; gap: 4px; }
+  .cycle-day-card .pill-tag { font-size: 0.8rem; }
+  .cycle-day-card .edit-btn {
+    margin-top: 8px;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 3px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.75rem;
+  }
+  .cycle-day-card .edit-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-save-schedule {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 10px 30px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 600;
+    transition: opacity 0.2s;
+  }
+  .btn-save-schedule:hover { opacity: 0.85; }
+
+  .btn-reset {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    margin-left: 10px;
+  }
+  .btn-reset:hover { border-color: #ff6b6b; color: #ff6b6b; }
+
+  /* ---- MODAL ---- */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    display: none; justify-content: center; align-items: center; z-index: 100;
+  }
+  .modal-overlay.visible { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px;
+    min-width: 320px; max-width: 400px; width: 90%;
+  }
+  .modal h3 { color: var(--accent); margin-bottom: 18px; }
+  .modal .pill-input-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .modal .pill-input-row label { flex: 1; font-size: 0.95rem; }
+  .modal .pill-input-row input {
+    width: 70px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); padding: 6px 10px; border-radius: 6px; text-align: center; font-size: 1rem;
+  }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+  .modal-actions button {
+    padding: 8px 20px; border-radius: 8px; cursor: pointer; font-size: 0.9rem;
+    border: 1px solid var(--border); background: var(--surface2); color: var(--text);
+  }
+  .modal-actions button:hover { border-color: var(--accent); }
+  .modal-actions button.primary { background: var(--accent); border-color: var(--accent); }
+
+  .legend { max-width: 900px; margin: 0 auto 10px; display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--text-dim); }
+  .instructions { max-width: 900px; margin: 0 auto 10px; text-align: center; font-size: 0.82rem; color: var(--text-dim); }
+
+  @media (max-width: 700px) {
+    .boxes-grid { grid-template-columns: 1fr; }
+    .stock-inputs { flex-direction: column; align-items: center; }
+    .day-cell { min-height: 80px; padding: 4px; }
+    .day-number { font-size: 0.75rem; }
+    .pill-tag { font-size: 0.65rem; padding: 1px 4px; }
+    .month-label { font-size: 1.1rem; min-width: 180px; }
+    .range-totals { gap: 14px; }
+    .cycle-preview { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<h1>💧 Календарь приёма растворов</h1>
+
+<div class="instructions">
+  Кликните на день начала диапазона, затем на день конца. Расписание непрерывное, рассчитывается от даты старта цикла.
+</div>
+
+<div class="legend">
+  <div class="legend-item"><span class="pill-tag pill-ж">ж</span> — раствор Ж</div>
+  <div class="legend-item"><span class="pill-tag pill-зб">зб</span> — раствор ЗБ</div>
+  <div class="legend-item"><span class="pill-tag pill-зм">зм</span> — раствор ЗМ</div>
+</div>
+
+<div class="controls">
+  <button id="btnPrev">◀ Пред.</button>
+  <div class="month-label" id="monthLabel"></div>
+  <button id="btnNext">След. ▶</button>
+  <button id="btnToday">Сегодня</button>
+</div>
+
+<div class="calendar" id="calendar"></div>
+
+<!-- STOCK PANEL -->
+<div class="stock-panel" id="stockPanel">
+  <h3>📦 Текущие остатки пакетов</h3>
+  <div class="stock-inputs">
+    <div class="stock-item">
+      <span class="pill-tag pill-ж">ж</span>
+      <input type="number" id="stockЖ" min="0" value="0">
+    </div>
+    <div class="stock-item">
+      <span class="pill-tag pill-зб">зб</span>
+      <input type="number" id="stockЗБ" min="0" value="0">
+    </div>
+    <div class="stock-item">
+      <span class="pill-tag pill-зм">зм</span>
+      <input type="number" id="stockЗМ" min="0" value="0">
+    </div>
+  </div>
+  <button class="btn-save-stock" id="btnSaveStock">💾 Сохранить остатки</button>
+</div>
+
+<!-- RANGE SUMMARY -->
+<div class="range-summary" id="rangeSummary">
+  <h3>📊 Расчёт за период</h3>
+  <div class="range-dates" id="rangeDates"></div>
+  
+  <div class="boxes-grid">
+    <div class="box-card ж">
+      <div class="box-label">Раствор ж</div>
+      <div class="box-row"><span>Требуется:</span> <span class="val" id="reqЖ">0</span></div>
+      <div class="box-row"><span>В остатках:</span> <span class="val" id="stockЖVal">0</span></div>
+      <div class="box-row need"><span>Докупить пак.:</span> <span class="val" id="needЖ">0</span></div>
+      <div class="box-count-main" id="boxЖ">🛒 0 кор.</div>
+      <div class="box-row left"><span>Останется:</span> <span class="val" id="leftЖ">0</span></div>
+    </div>
+    <div class="box-card зб">
+      <div class="box-label">Раствор зб</div>
+      <div class="box-row"><span>Требуется:</span> <span class="val" id="reqЗБ">0</span></div>
+      <div class="box-row"><span>В остатках:</span> <span class="val" id="stockЗБVal">0</span></div>
+      <div class="box-row need"><span>Докупить пак.:</span> <span class="val" id="needЗБ">0</span></div>
+      <div class="box-count-main" id="boxЗБ">🛒 0 кор.</div>
+      <div class="box-row left"><span>Останется:</span> <span class="val" id="leftЗБ">0</span></div>
+    </div>
+    <div class="box-card зм">
+      <div class="box-label">Раствор зм</div>
+      <div class="box-row"><span>Требуется:</span> <span class="val" id="reqЗМ">0</span></div>
+      <div class="box-row"><span>В остатках:</span> <span class="val" id="stockЗМVal">0</span></div>
+      <div class="box-row need"><span>Докупить пак.:</span> <span class="val" id="needЗМ">0</span></div>
+      <div class="box-count-main" id="boxЗМ">🛒 0 кор.</div>
+      <div class="box-row left"><span>Останется:</span> <span class="val" id="leftЗМ">0</span></div>
+    </div>
+  </div>
+
+  <button class="btn-clear-range" id="btnClearRange">Сбросить диапазон</button>
+</div>
+
+<div class="settings-toggle">
+  <button id="btnSettings">⚙️ Настроить расписание</button>
+</div>
+
+<div class="settings-panel" id="settingsPanel">
+  <h3>Настройка расписания</h3>
+  <div class="setting-group">
+    <label for="cycleStartDate">Дата начала цикла:</label>
+    <input type="date" id="cycleStartDate">
+  </div>
+  <div class="setting-group">
+    <label>Цикл приёма (дни):</label>
+    <div class="cycle-preview" id="cyclePreview"></div>
+  </div>
+  <div style="margin-top:20px;">
+    <button class="btn-save-schedule" id="btnSaveSchedule">💾 Сохранить и применить</button>
+    <button class="btn-reset" id="btnResetSchedule">Сбросить по умолчанию</button>
+  </div>
+</div>
+
+<!-- Edit modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3 id="modalTitle">Редактирование дня цикла</h3>
+    <div class="pill-input-row">
+      <label class="pill-tag pill-ж">ж</label>
+      <input type="number" id="editЖ" min="0" max="99" value="0">
+    </div>
+    <div class="pill-input-row">
+      <label class="pill-tag pill-зб">зб</label>
+      <input type="number" id="editЗБ" min="0" max="99" value="0">
+    </div>
+    <div class="pill-input-row">
+      <label class="pill-tag pill-зм">зм</label>
+      <input type="number" id="editЗМ" min="0" max="99" value="0">
+    </div>
+    <div class="modal-actions">
+      <button id="modalCancel">Отмена</button>
+      <button class="primary" id="modalSave">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ CONFIG ============
+const BOX_CONTENT = { ж: 2, зб: 2, зм: 4 };
+const DEFAULT_CYCLE = [
+  { ж: 2, зб: 0, зм: 1 },
+  { ж: 2, зб: 0, зм: 1 },
+  { ж: 1, зб: 1, зм: 1 }
+];
+const DEFAULT_START_DATE = '2025-01-01';
+
+// ============ STATE ============
+let state = {
+  currentDate: new Date(),
+  cycleStartDate: DEFAULT_START_DATE,
+  cycle: JSON.parse(JSON.stringify(DEFAULT_CYCLE)),
+  rangeStart: null,
+  rangeEnd: null,
+  stock: { ж: 0, зб: 0, зм: 0 }
+};
+
+// ============ LOCAL STORAGE ============
+function saveSettings() {
+  localStorage.setItem('solutionCalendar', JSON.stringify({
+    cycleStartDate: state.cycleStartDate,
+    cycle: state.cycle,
+    stock: state.stock
+  }));
+}
+
+function loadSettings() {
+  const raw = localStorage.getItem('solutionCalendar');
+  if (raw) {
+    try {
+      const data = JSON.parse(raw);
+      if (data.cycleStartDate) state.cycleStartDate = data.cycleStartDate;
+      if (data.cycle && Array.isArray(data.cycle)) state.cycle = data.cycle;
+      if (data.stock) state.stock = { ...{ ж: 0, зб: 0, зм: 0 }, ...data.stock };
+    } catch(e) {}
+  }
+  // Sync inputs
+  document.getElementById('stockЖ').value = state.stock.ж;
+  document.getElementById('stockЗБ').value = state.stock.зб;
+  document.getElementById('stockЗМ').value = state.stock.зм;
+}
+
+// ============ DATE HELPERS ============
+function dateKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function parseDate(s) {
+  const [y,m,d] = s.split('-').map(Number);
+  return new Date(y, m-1, d);
+}
+
+function daysBetween(a, b) {
+  const utcA = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate());
+  const utcB = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate());
+  return Math.round((utcB - utcA) / 86400000);
+}
+
+function getDayType(date) {
+  const start = parseDate(state.cycleStartDate);
+  const diff = daysBetween(start, date);
+  const cycleLen = state.cycle.length;
+  const idx = ((diff % cycleLen) + cycleLen) % cycleLen;
+  return state.cycle[idx];
+}
+
+const MONTH_NAMES = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+const WEEKDAYS = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+
+// ============ RENDER CALENDAR ============
+function renderCalendar() {
+  const year = state.currentDate.getFullYear();
+  const month = state.currentDate.getMonth();
+  document.getElementById('monthLabel').textContent = `${MONTH_NAMES[month]} ${year}`;
+
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const daysInMonth = lastDay.getDate();
+  let startDow = firstDay.getDay() - 1;
+  if (startDow < 0) startDow = 6;
+
+  const today = new Date();
+  const todayKey = dateKey(today);
+
+  let html = '<div class="weekday-row">';
+  WEEKDAYS.forEach(w => html += `<span>${w}</span>`);
+  html += '</div><div class="days-grid">';
+
+  for (let i = 0; i < startDow; i++) html += '<div class="day-cell empty"></div>';
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(year, month, d);
+    const key = dateKey(date);
+    const dayType = getDayType(date);
+    const isToday = key === todayKey;
+
+    let rangeClass = '';
+    if (state.rangeStart && state.rangeEnd) {
+      const rs = dateKey(state.rangeStart);
+      const re = dateKey(state.rangeEnd);
+      if (key === rs) rangeClass = 'range-start';
+      else if (key === re) rangeClass = 'range-end';
+      else if (key > rs && key < re) rangeClass = 'in-range';
+    }
+
+    let pillsHtml = '';
+    if (dayType.ж > 0) pillsHtml += `<span class="pill-tag pill-ж">${dayType.ж}ж</span>`;
+    if (dayType.зб > 0) pillsHtml += `<span class="pill-tag pill-зб">${dayType.зб}зб</span>`;
+    if (dayType.зм > 0) pillsHtml += `<span class="pill-tag pill-зм">${dayType.зм}зм</span>`;
+
+    html += `<div class="day-cell ${isToday ? 'today' : ''} ${rangeClass}" data-date="${key}">
+      <div class="day-number">${d}</div>
+      <div class="pills-list">${pillsHtml}</div>
+    </div>`;
+  }
+
+  html += '</div>';
+  document.getElementById('calendar').innerHTML = html;
+
+  document.querySelectorAll('.day-cell:not(.empty)').forEach(cell => {
+    cell.addEventListener('click', () => handleDayClick(cell.dataset.date));
+  });
+
+  renderRangeSummary();
+}
+
+// ============ RANGE SELECTION ============
+function handleDayClick(key) {
+  const clickedDate = parseDate(key);
+  if (!state.rangeStart) {
+    state.rangeStart = clickedDate;
+    state.rangeEnd = null;
+  } else if (!state.rangeEnd) {
+    state.rangeEnd = clickedDate;
+    if (state.rangeEnd < state.rangeStart) {
+      [state.rangeStart, state.rangeEnd] = [state.rangeEnd, state.rangeStart];
+    }
+  } else {
+    state.rangeStart = clickedDate;
+    state.rangeEnd = null;
+  }
+  renderCalendar();
+}
+
+function renderRangeSummary() {
+  const el = document.getElementById('rangeSummary');
+  if (!state.rangeStart) {
+    el.classList.remove('visible');
+    return;
+  }
+
+  el.classList.add('visible');
+  const start = state.rangeStart;
+  const end = state.rangeEnd || state.rangeStart;
+  const startDateStr = start.toLocaleDateString('ru-RU');
+  const endDateStr = state.rangeEnd ? end.toLocaleDateString('ru-RU') : startDateStr;
+
+  document.getElementById('rangeDates').textContent =
+    state.rangeEnd ? `${startDateStr} — ${endDateStr}` : `Выбран: ${startDateStr}`;
+
+  let totalЖ = 0, totalЗБ = 0, totalЗМ = 0;
+  const current = new Date(start);
+  while (current <= end) {
+    const dayType = getDayType(current);
+    totalЖ += dayType.ж || 0;
+    totalЗБ += dayType.зб || 0;
+    totalЗМ += dayType.зм || 0;
+    current.setDate(current.getDate() + 1);
+  }
+
+  const stockЖ = state.stock.ж || 0;
+  const stockЗБ = state.stock.зб || 0;
+  const stockЗМ = state.stock.зм || 0;
+
+  const needЖ = Math.max(0, totalЖ - stockЖ);
+  const needЗБ = Math.max(0, totalЗБ - stockЗБ);
+  const needЗМ = Math.max(0, totalЗМ - stockЗМ);
+
+  const boxesЖ = needЖ > 0 ? Math.ceil(needЖ / BOX_CONTENT.ж) : 0;
+  const boxesЗБ = needЗБ > 0 ? Math.ceil(needЗБ / BOX_CONTENT.зб) : 0;
+  const boxesЗМ = needЗМ > 0 ? Math.ceil(needЗМ / BOX_CONTENT.зм) : 0;
+
+  const afterЖ = stockЖ + (boxesЖ * BOX_CONTENT.ж) - totalЖ;
+  const afterЗБ = stockЗБ + (boxesЗБ * BOX_CONTENT.зб) - totalЗБ;
+  const afterЗМ = stockЗМ + (boxesЗМ * BOX_CONTENT.зм) - totalЗМ;
+
+  // Fill UI
+  const setCard = (type, req, stock, need, boxes, after) => {
+    document.getElementById(`req${type}`).textContent = req;
+    document.getElementById(`stock${type}Val`).textContent = stock;
+    document.getElementById(`need${type}`).textContent = need;
+    document.getElementById(`box${type}`).textContent = `🛒 ${boxes} кор.`;
+    document.getElementById(`left${type}`).textContent = after;
+  };
+
+  setCard('Ж', totalЖ, stockЖ, needЖ, boxesЖ, afterЖ);
+  setCard('ЗБ', totalЗБ, stockЗБ, needЗБ, boxesЗБ, afterЗБ);
+  setCard('ЗМ', totalЗМ, stockЗМ, needЗМ, boxesЗМ, afterЗМ);
+}
+
+// ============ STOCK INPUTS ============
+document.getElementById('btnSaveStock').addEventListener('click', () => {
+  state.stock = {
+    ж: parseInt(document.getElementById('stockЖ').value) || 0,
+    зб: parseInt(document.getElementById('stockЗБ').value) || 0,
+    зм: parseInt(document.getElementById('stockЗМ').value) || 0
+  };
+  saveSettings();
+  renderRangeSummary();
+  alert('✅ Остатки сохранены!');
+});
+
+// ============ NAVIGATION ============
+document.getElementById('btnPrev').addEventListener('click', () => {
+  state.currentDate.setMonth(state.currentDate.getMonth() - 1);
+  renderCalendar();
+});
+document.getElementById('btnNext').addEventListener('click', () => {
+  state.currentDate.setMonth(state.currentDate.getMonth() + 1);
+  renderCalendar();
+});
+document.getElementById('btnToday').addEventListener('click', () => {
+  state.currentDate = new Date();
+  renderCalendar();
+});
+document.getElementById('btnClearRange').addEventListener('click', () => {
+  state.rangeStart = null; state.rangeEnd = null;
+  renderCalendar();
+});
+
+// ============ SETTINGS ============
+document.getElementById('btnSettings').addEventListener('click', () => {
+  document.getElementById('settingsPanel').classList.toggle('visible');
+  if (document.getElementById('settingsPanel').classList.contains('visible')) renderSettings();
+});
+
+function renderSettings() {
+  document.getElementById('cycleStartDate').value = state.cycleStartDate;
+  renderCyclePreview();
+}
+
+function renderCyclePreview() {
+  const container = document.getElementById('cyclePreview');
+  let html = '';
+  state.cycle.forEach((day, i) => {
+    html += `<div class="cycle-day-card">
+      <div class="day-label">День ${i + 1}</div>
+      <div class="pills">
+        ${day.ж > 0 ? `<span class="pill-tag pill-ж">${day.ж}ж</span>` : ''}
+        ${day.зб > 0 ? `<span class="pill-tag pill-зб">${day.зб}зб</span>` : ''}
+        ${day.зм > 0 ? `<span class="pill-tag pill-зм">${day.зм}зм</span>` : ''}
+        ${day.ж === 0 && day.зб === 0 && day.зм === 0 ? '<span style="color:var(--text-dim);font-size:0.8rem;">нет пакетов</span>' : ''}
+      </div>
+      <button class="edit-btn" data-index="${i}">✏️ Изменить</button>
+    </div>`;
+  });
+  html += `<div class="cycle-day-card" style="display:flex;align-items:center;justify-content:center;border-style:dashed;">
+    <button class="edit-btn" id="btnAddDay" style="font-size:1.2rem;padding:8px 16px;">＋ Добавить день</button>
+  </div>`;
+  container.innerHTML = html;
+
+  container.querySelectorAll('.edit-btn[data-index]').forEach(btn => {
+    btn.addEventListener('click', () => openEditModal(parseInt(btn.dataset.index)));
+  });
+
+  const addBtn = document.getElementById('btnAddDay');
+  if (addBtn) {
+    addBtn.addEventListener('click', () => {
+      state.cycle.push({ ж: 0, зб: 0, зм: 0 });
+      renderCyclePreview();
+    });
+  }
+}
+
+let editingIndex = -1;
+function openEditModal(index) {
+  editingIndex = index;
+  const day = state.cycle[index];
+  document.getElementById('editЖ').value = day.ж;
+  document.getElementById('editЗБ').value = day.зб;
+  document.getElementById('editЗМ').value = day.зм;
+  document.getElementById('modalTitle').textContent = `День ${index + 1} цикла`;
+  document.getElementById('modalOverlay').classList.add('visible');
+}
+
+document.getElementById('modalCancel').addEventListener('click', () => {
+  document.getElementById('modalOverlay').classList.remove('visible');
+});
+document.getElementById('modalSave').addEventListener('click', () => {
+  if (editingIndex < 0) return;
+  state.cycle[editingIndex] = {
+    ж: parseInt(document.getElementById('editЖ').value) || 0,
+    зб: parseInt(document.getElementById('editЗБ').value) || 0,
+    зм: parseInt(document.getElementById('editЗМ').value) || 0
+  };
+  document.getElementById('modalOverlay').classList.remove('visible');
+  renderCyclePreview();
+});
+document.getElementById('modalOverlay').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('modalOverlay')) {
+    document.getElementById('modalOverlay').classList.remove('visible');
+  }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') document.getElementById('modalOverlay').classList.remove('visible');
+});
+
+document.getElementById('btnSaveSchedule').addEventListener('click', () => {
+  state.cycleStartDate = document.getElementById('cycleStartDate').value;
+  if (!state.cycleStartDate) return alert('Укажите дату начала цикла!');
+  if (state.cycle.length === 0) return alert('Цикл должен содержать хотя бы один день!');
+  saveSettings();
+  renderCalendar();
+  alert('✅ Расписание сохранено и применено!');
+});
+
+document.getElementById('btnResetSchedule').addEventListener('click', () => {
+  if (!confirm('Сбросить расписание на значения по умолчанию?')) return;
+  state.cycle = JSON.parse(JSON.stringify(DEFAULT_CYCLE));
+  state.cycleStartDate = DEFAULT_START_DATE;
+  document.getElementById('cycleStartDate').value = state.cycleStartDate;
+  saveSettings();
+  renderCyclePreview();
+  renderCalendar();
+});
+
+// ============ INIT ============
+loadSettings();
+document.getElementById('cycleStartDate').value = state.cycleStartDate;
+renderCalendar();
+</script>
+</body>
+</html>
